@@ -16,6 +16,10 @@ import torch
 from torch.autograd import Variable
 import torch.nn as nn
 
+#torch.set_default_tensor_type('torch.cuda.FloatTensor')
+
+#cutorch = require 'cutorch'
+
 torch.manual_seed(42)
 
 
@@ -41,19 +45,16 @@ ntags = len(t2i)
 
 
 # The parameters for our BoW-model
-dtype = torch.FloatTensor  # enable CUDA here if you like
+dtype = torch.cuda.FloatTensor  # enable CUDA here if you like
 w = Variable(torch.randn(nwords, ntags).type(dtype), requires_grad=True)
-### YOUR CODE HERE ###
-raise NotImplementedError("TODO add bias parameters")
-
+b = Variable(torch.randn(1, ntags).type(dtype), requires_grad=True)
 
 # A function to calculate scores for one sentence
 def calc_scores(words):
-    lookup_tensor = Variable(torch.LongTensor(words))
-    embed = w[lookup_tensor]
+    lookup_tensor = Variable(torch.cuda.LongTensor(words))
+    embed = w[lookup_tensor] + b
     score = torch.sum(embed, 0)
-    ### YOUR CODE HERE ###
-    raise NotImplementedError("TODO add bias")
+    
     return score.view((1, -1))
 
 
@@ -68,7 +69,7 @@ for ITER in range(100):
         
         # forward pass
         scores = calc_scores(words)
-        target = Variable(torch.LongTensor([tag]))        
+        target = Variable(torch.cuda.LongTensor([tag]))        
         loss = nn.CrossEntropyLoss()
         output = loss(scores, target)
         train_loss += output.data[0]        
@@ -79,14 +80,11 @@ for ITER in range(100):
         # update weights with SGD
         lr = 0.01
         w.data -= lr * w.grad.data
-        ### YOUR CODE HERE ###
-        raise NotImplementedError("TODO update bias parameters")
-
-        # clear gradients for next step
+        b.data -= lr * b.grad.data
+	
+	# clear gradients for next step
         w.grad.data.zero_()
-        ### YOUR CODE HERE ###
-        raise NotImplementedError("TODO zero out bias gradients")
-
+        b.grad.data.zero_()
         
     print("iter %r: train loss/sent=%.4f, time=%.2fs" % 
           (ITER, train_loss/len(train), time.time()-start))
@@ -95,7 +93,7 @@ for ITER in range(100):
     correct = 0.0
     for words, tag in dev:
         scores = calc_scores(words)
-        predict = scores.data.numpy().argmax(axis=1)
+        predict = scores.data.cpu().numpy().argmax(axis=1)
         if predict == tag:
             correct += 1
     
